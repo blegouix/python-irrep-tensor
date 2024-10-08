@@ -60,6 +60,16 @@ class Coo:
                 id = tuple(slice.m_idx[:-1,l].astype(int));
                 prod[id] = prod[id] + x_k*slice.m_values[l]
         return prod
+
+    # /!\ support only coalescent axis
+    def __matmul__(self, x):
+        prod = np.zeros(self.m_ndims[0])
+        for k in range(0, self.m_ndims[0]):
+            slice = self.get(k, axis=0)
+            for l in range(0, slice.m_idx.shape[1]):
+                id = tuple(slice.m_idx[1:,l].astype(int));
+                prod[k] = prod[k] + slice.m_values[l]*x[id]
+        return prod
                 
 def coo2dense(coo):
     dense = np.zeros(coo.m_ndims);
@@ -116,7 +126,8 @@ class Tensor:
         return self.m_V*self.m_data 
 
     def set(self, x):
-        self.m_data = np.tensordot(coo2dense(self.m_U), x, axes=self.m_r)
+        self.m_data = self.m_U@x 
+        # self.m_data = np.tensordot(coo2dense(self.m_U), x, axes=self.m_r)
 
 # Projector filler
 def fill(T, idx, lambda_func):
@@ -157,8 +168,6 @@ AntiSym = (Tr-I)/2
 
 #test
 tensor = Tensor(AntiSym)
-# print(tensor.m_U.m_idx)
-# print(tensor.m_U.m_values)
 
 test = np.empty((d,d))
 
