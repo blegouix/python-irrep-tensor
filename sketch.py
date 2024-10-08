@@ -51,13 +51,14 @@ class Coo:
         return coo 
 
     # /!\ support only coalescent axis
-    def __mul__(self, x):
-        prod = np.zeros(self.m_ndims[:-1])
-        for k in range(0, self.m_ndims[-1]):
-            slice = self.get(k, axis=-1)
+    def mult(self, x, **kwargs):
+        axis = kwargs.get('axis', None);
+        prod = np.zeros(self.m_ndims[:axis])
+        for k in range(0, self.m_ndims[axis]):
+            slice = self.get(k, axis=axis)
             x_k = x[k]
             for l in range(0, slice.m_idx.shape[1]):
-                id = tuple(slice.m_idx[:-1,l].astype(int));
+                id = tuple(slice.m_idx[:axis,l].astype(int));
                 prod[id] = prod[id] + x_k*slice.m_values[l]
         return prod
 
@@ -123,7 +124,7 @@ class Tensor:
         [self.m_U, self.m_V] = self.orthonormal_basis_subspace_eigenvalue_1(Proj)
 
     def __call__(self):
-        return self.m_V*self.m_data 
+        return self.m_V.mult(self.m_data, axis=self.m_r) 
 
     def set(self, x):
         self.m_data = self.m_U@x 
