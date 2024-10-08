@@ -1,4 +1,5 @@
 import numpy as np
+import itertools
 
 # COO storage
 class Coo:
@@ -48,6 +49,17 @@ class Coo:
         #enforce id=0 in the axis orthogonal to the slice
         coo.m_idx[kwargs.get('axis', None), :] = 0
         return coo 
+
+    # /!\ support only coalescent axis
+    def __mul__(self, x):
+        prod = np.zeros(self.m_ndims[:-1])
+        for k in range(0, self.m_ndims[-1]):
+            slice = self.get(k, axis=-1)
+            x_k = x[k]
+            for l in range(0, slice.m_idx.shape[1]):
+                id = tuple(slice.m_idx[:-1,l].astype(int));
+                prod[id] = prod[id] + x_k*slice.m_values[l]
+        return prod
                 
 def coo2dense(coo):
     dense = np.zeros(coo.m_ndims);
@@ -101,10 +113,10 @@ class Tensor:
         [self.m_U, self.m_V] = self.orthonormal_basis_subspace_eigenvalue_1(Proj)
 
     def __call__(self):
-       return np.tensordot(coo2dense(self.m_V), self.m_data, axes=1)
+        return self.m_V*self.m_data 
 
     def set(self, x):
-       self.m_data = np.tensordot(coo2dense(self.m_U), x, axes=self.m_r)
+        self.m_data = np.tensordot(coo2dense(self.m_U), x, axes=self.m_r)
 
 # Projector filler
 def fill(T, idx, lambda_func):
@@ -144,6 +156,10 @@ Sym = (Tr+I)/2
 AntiSym = (Tr-I)/2 
 
 #test
+tensor = Tensor(AntiSym)
+# print(tensor.m_U.m_idx)
+# print(tensor.m_U.m_values)
+
 test = np.empty((d,d))
 
 for i in range(0,d):
@@ -151,9 +167,6 @@ for i in range(0,d):
         test[i,j] = j-i
 print(test)
 
-tensor = Tensor(AntiSym)
-print(tensor.m_U.m_idx)
-print(tensor.m_U.m_values)
 tensor.set(test)
 uncompressed_test = tensor()
 print(np.all(abs(uncompressed_test-test)<1e-14))
