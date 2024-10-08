@@ -106,28 +106,36 @@ class Tensor:
     def set(self, x):
        self.m_data = np.tensordot(coo2dense(self.m_U), x, axes=self.m_r)
 
+# Projector filler
+def fill(T, idx, lambda_func):
+    r = len(T.shape)
+    d = T.shape[0]
+    for i in range(0,d):
+        new_idx = idx + (i,)
+        if len(new_idx)==r:
+            lambda_func(T, new_idx)
+        else:
+            fill(T, new_idx, lambda_func)
+
+def I_lambda(T, idx):
+    if idx[0]==idx[2] and idx[1]==idx[3]:
+        T[idx] = 1
+
+def Tr_lambda(T, idx):
+    if idx[0]==idx[3] and idx[1]==idx[2]:
+        T[idx] = 1
+
+
 # main
 d = 4 # dimension
 
 # Create rank-2 identity operator
 I = np.zeros((d, d, d, d))
-
-for i in range(0,d):
-    for j in range(0,d):
-        for k in range(0,d):
-            for l in range(0,d):
-                if i==k and j==l:
-                    I[i,j,k,l] = 1
+fill(I, (), I_lambda)
 
 # Create rank-2 transpose operator
 Tr = np.zeros((d, d, d, d))
-
-for i in range(0,d):
-    for j in range(0,d):
-        for k in range(0,d):
-            for l in range(0,d):
-                if i==l and j==k:
-                    Tr[i,j,k,l] = 1
+fill(Tr, (), Tr_lambda)
 
 # Create symmetric projection
 Sym = (Tr+I)/2
