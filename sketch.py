@@ -41,7 +41,7 @@ class Csr:
         ndims = np.copy(self.m_ndims)
         ndims[kwargs.get('axis', None)] = 1
         csr = Csr(ndims)
-        csr.copy_construct(ndims, np.array([0, self.m_coalesc_idx[id+1]-self.m_coalesc_idx[id]]), np.array([self.m_idx[:,i] for i in range(self.m_coalesc_idx[id], self.m_coalesc_idx[id+1])]), np.array([self.m_values[i] for i in range(self.m_coalesc_idx[id], self.m_coalesc_idx[id+1])]))
+        csr.copy_construct(ndims, np.array([0, self.m_coalesc_idx[id+1]-self.m_coalesc_idx[id]]), np.transpose(np.array([self.m_idx[:,i] for i in range(self.m_coalesc_idx[id], self.m_coalesc_idx[id+1])])), np.array([self.m_values[i] for i in range(self.m_coalesc_idx[id], self.m_coalesc_idx[id+1])]))
         return csr 
 
     # /!\ untested for non-coalescent axis
