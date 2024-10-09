@@ -50,15 +50,18 @@ class Coo:
         coo.m_idx[kwargs.get('axis', None), :] = 0
         return coo 
 
-    # /!\ support only coalescent axis
+    # /!\ untested for non-coalescent axis
     def mult(self, x, **kwargs):
         operate_on = kwargs.get('operate_on', None);
-        axis = list(np.arange(0, len(x.shape))) if operate_on=="left" else list(np.arange(len(self.m_ndims)-len(x.shape), len(self.m_ndims)));
-        axis_ortho = [ax for ax in list(np.arange(0, len(self.m_ndims))) if ax not in axis]
+        axis_left = list(np.arange(0, len(x.shape)) if operate_on=="left" else np.arange(0, len(self.m_ndims)-len(x.shape)))
+        axis_right = [ax for ax in list(np.arange(0, len(self.m_ndims))) if ax not in axis_left]
+        axis_prod = axis_left if operate_on=="left" else axis_right
+        axis_ortho = axis_right if operate_on=="left" else axis_left
         prod = np.zeros(self.m_ndims[axis_ortho])
         for k in range(0, self.m_idx.shape[1]):
-            id = tuple(self.m_idx[axis_ortho if operate_on=="left" else axis,k].astype(int));
-            prod[id if operate_on=="left" else self.m_idx[axis_ortho,k].astype(int)] = prod[id if operate_on=="left" else self.m_idx[axis_ortho,k].astype(int)] + x[self.m_idx[axis,k].astype(int) if operate_on=="left" else id]*self.m_values[k]
+            id_prod = tuple(self.m_idx[axis_prod,k].astype(int));
+            id_ortho = tuple(self.m_idx[axis_ortho,k].astype(int));
+            prod[id_ortho] = prod[id_ortho] + x[id_prod]*self.m_values[k]
         return prod
                 
 def coo2dense(coo):
