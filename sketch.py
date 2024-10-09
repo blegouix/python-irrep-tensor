@@ -1,73 +1,72 @@
 import numpy as np
 import itertools
 
-# COO storage
-class Coo:
-    m_ndims = np.empty(0) 
-    m_idx = np.empty(0) 
-    m_values = np.empty(0)
+# CSR storage
+class Csr:
+    m_ndims = np.empty(0, dtype=int) 
+    m_coalesc_idx = np.empty(0, dtype=int) 
+    m_idx = np.empty(0, dtype=int) 
+    m_values = np.empty(0, dtype=np.double)
 
     def __init__(self, ndims):
-        self.m_ndims = np.array(ndims) 
-        self.m_idx = np.empty((len(ndims), 0))
-        self.m_values = np.empty(0)
+        self.m_ndims = np.array(ndims, dtype=int) 
+        self.m_coalesc_idx = np.zeros(1, dtype=int)
+        self.m_idx = np.empty((len(ndims)-1, 0), dtype=int)
+        self.m_values = np.empty(0, dtype=np.double)
 
-    def copy_construct(self, ndims, idx, values):
+    def copy_construct(self, ndims, coalesc_idx, idx, values):
         self.m_ndims = np.array(ndims) 
+        self.m_coalesc_idx = coalesc_idx
         self.m_idx = idx
         self.m_values = np.array(values) 
     
     def append_dense(self, dense, **kwargs):
-        idx = np.nonzero(dense)
-        self.m_values = np.append(self.m_values, dense[idx])
-        idx = np.array(idx)
-        for i in range(0, idx.shape[1]):
-            idx[kwargs.get('axis', None), i] = self.m_ndims[kwargs.get('axis', None)]
+        idx = np.array(np.nonzero(dense))
         self.m_ndims[kwargs.get('axis', None)] = self.m_ndims[kwargs.get('axis', None)]+1
-        self.m_idx = np.append(self.m_idx, idx, 1)
+        self.m_coalesc_idx = np.append(self.m_coalesc_idx, self.m_coalesc_idx[-1]+idx.shape[1])
+        self.m_idx = np.append(self.m_idx, idx, axis=1)
+        self.m_values = np.append(self.m_values, dense[tuple(idx)])
 
-    def append_coo(self, coo, **kwargs):
-        self.m_values = np.append(self.m_values, coo.m_values)
+    """
+    def append_csr(self, csr, **kwargs):
         self.m_ndims[kwargs.get('axis', None)] = self.m_ndims[kwargs.get('axis', None)]+1
-        self.m_idx = np.append(self.m_idx, coo.m_idx, 1)
+        
+        self.m_coalesc_idx = np.append(self.m_coalesc_idx, self.m_coalesc_idx[-1]+csr.m_coalesc_idx)
+        self.m_idx = np.append(self.m_idx, csr.m_idx, axis=1)
+        self.m_values = np.append(self.m_values, csr.m_values)
+    """
 
     # /!\ support only coalescent axis
     def get(self, id, **kwargs):
-        i = 0
         ndims = np.copy(self.m_ndims)
-        ndims[kwargs.get('axis', None)] = 0
-        coo = Coo(ndims)
-        coo_ = Coo(ndims) # trick to enforce correct indexing along axis
-        while i<self.m_idx.shape[1] and self.m_idx[kwargs.get('axis', None), i]<=id:
-            if self.m_idx[kwargs.get('axis', None), i]==id:
-                coo_to_add = Coo(ndims)
-                coo_to_add.copy_construct(ndims, np.expand_dims(self.m_idx[:,i], axis=-1), self.m_values[i])
-                coo_.append_coo(coo_to_add, axis=kwargs.get('axis', None))
-            i = i+1
-        coo.append_coo(coo_, axis=kwargs.get('axis', None)) 
-        
-        #enforce id=0 in the axis orthogonal to the slice
-        coo.m_idx[kwargs.get('axis', None), :] = 0
-        return coo 
+        ndims[kwargs.get('axis', None)] = 1
+        csr = Csr(ndims)
+        csr.copy_construct(ndims, np.array([0, self.m_coalesc_idx[id+1]-self.m_coalesc_idx[id]]), np.array([self.m_idx[:,i] for i in range(self.m_coalesc_idx[id], self.m_coalesc_idx[id+1])]), np.array([self.m_values[i] for i in range(self.m_coalesc_idx[id], self.m_coalesc_idx[id+1])]))
+        return csr 
 
     # /!\ untested for non-coalescent axis
     def mult(self, x, **kwargs):
         operate_on = kwargs.get('operate_on', None);
-        axis_left = list(np.arange(0, len(x.shape)) if operate_on=="left" else np.arange(0, len(self.m_ndims)-len(x.shape)))
+        axis_left = list(np.arange(0, len(x.shape)) if operate_on=="left" else np.arange(0, len(self.m_ndims)-len(x.shape))) # in practice this is just list(0)
+        # TODO: assert axis_left rank being one
         axis_right = [ax for ax in list(np.arange(0, len(self.m_ndims))) if ax not in axis_left]
         axis_prod = axis_left if operate_on=="left" else axis_right
         axis_ortho = axis_right if operate_on=="left" else axis_left
         prod = np.zeros(self.m_ndims[axis_ortho])
-        for k in range(0, self.m_idx.shape[1]):
-            id_prod = tuple(self.m_idx[axis_prod,k].astype(int));
-            id_ortho = tuple(self.m_idx[axis_ortho,k].astype(int));
-            prod[id_ortho] = prod[id_ortho] + x[id_prod]*self.m_values[k]
+        for coalesc_id_id in range(0, len(self.m_coalesc_idx)-1):
+            id_left = (coalesc_id_id,);
+            for k in range(self.m_coalesc_idx[coalesc_id_id], self.m_coalesc_idx[coalesc_id_id+1]):
+                id_right = tuple(self.m_idx[:,k].astype(int));
+                id_prod = id_left if operate_on=="left" else id_right
+                id_ortho = id_right if operate_on=="left" else id_left
+                prod[id_ortho] = prod[id_ortho] + x[id_prod]*self.m_values[k]
         return prod
                 
-def coo2dense(coo):
-    dense = np.zeros(coo.m_ndims);
-    for i in range(0, np.size(coo.m_values)):
-        dense[tuple([int(coo.m_idx[j, i]) for j in range(0,len(coo.m_ndims))])] = coo.m_values[i]
+def csr2dense(csr):
+    dense = np.zeros(csr.m_ndims);
+    for coalesc_id_id in range(0, len(csr.m_coalesc_idx)-1):
+        for j in range(csr.m_coalesc_idx[coalesc_id_id], csr.m_coalesc_idx[coalesc_id_id+1]):
+            dense[(csr.m_coalesc_idx[coalesc_id_id],) + tuple([int(csr.m_idx[i, j]) for i in range(0,len(csr.m_ndims)-1)])] = csr.m_values[j]
     return dense
 
 
@@ -75,21 +74,21 @@ def coo2dense(coo):
 class Tensor:
     m_r = 0
     m_d = 0
-    m_U = np.empty(0) 
-    m_V = np.empty(0) 
+    m_U = Csr((0,)) 
+    m_V = Csr((0,)) 
     m_data = np.empty(0) 
 
     # Gram-shmidt approach to produce from vec an orthogonal vector to the vector space generated by basis
     def orthogonalize(self, vec, basis):
         for i in range(0,basis.m_ndims[0]):
-            eigentensor = coo2dense(basis.get(i, axis=0)).reshape(self.m_d,self.m_d)
+            eigentensor = csr2dense(basis.get(i, axis=0)).reshape(self.m_d,self.m_d)
             vec = vec - np.tensordot(vec, eigentensor)/np.tensordot(eigentensor, eigentensor)*eigentensor
         return vec
 
     # Build orthonormal basis for the eigen subspace associated to the eigenvalue 1 of the projection operator
     def orthonormal_basis_subspace_eigenvalue_1(self, Proj):
-        U = Coo((0,self.m_d,self.m_d)); 
-        V = Coo((0,self.m_d,self.m_d)); 
+        U = Csr((0,self.m_d,self.m_d)); 
+        V = Csr((0,self.m_d,self.m_d)); 
 
         index = 0;
         # while np.size(V, axis=2)<d*(d+1)//2:
@@ -106,8 +105,8 @@ class Tensor:
                 v = v/np.sqrt(np.tensordot(v, v)) # normalize
                 u = np.tensordot(np.tensordot(Tr, Proj), v) # not sure if this or u = v is correct
                 # u = v 
-                U.append_dense(u.reshape(1,self.m_d,self.m_d), axis=0)
-                V.append_dense(v.reshape(1,self.m_d,self.m_d), axis=0)
+                U.append_dense(u.reshape(self.m_d,self.m_d), axis=0)
+                V.append_dense(v.reshape(self.m_d,self.m_d), axis=0)
         return [U, V] 
 
     def __init__(self, Proj):
@@ -121,8 +120,6 @@ class Tensor:
 
     def set(self, x):
         self.m_data = self.m_U.mult(x, operate_on="right") 
-        # self.m_data = self.m_U@x 
-        # self.m_data = np.tensordot(coo2dense(self.m_U), x, axes=self.m_r)
 
 # Projector filler
 def fill(T, idx, lambda_func):
