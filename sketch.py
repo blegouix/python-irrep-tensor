@@ -132,23 +132,22 @@ def fill(T, idx, lambda_func):
         else:
             fill(T, new_idx, lambda_func)
 
-def I_lambda(T, idx):
-    if idx[0]==idx[2] and idx[1]==idx[3]:
-        T[idx] = 1
 
-def Tr_lambda(T, idx):
-    if idx[0]==idx[3] and idx[1]==idx[2]:
-        T[idx] = 1
+### ----- TESTS FOR MATRIXES ----- ###
 
-
-# main
 d = 4 # dimension
 
 # Create rank-2 identity operator
+def I_lambda(T, idx):
+    if idx[0]==idx[2] and idx[1]==idx[3]:
+        T[idx] = 1
 I = np.zeros((d, d, d, d))
 fill(I, (), I_lambda)
 
 # Create rank-2 transpose operator
+def Tr_lambda(T, idx):
+    if idx[1]==idx[2] and idx[0]==idx[3]:
+        T[idx] = 1
 Tr = np.zeros((d, d, d, d))
 fill(Tr, (), Tr_lambda)
 
@@ -167,6 +166,71 @@ for i in range(0,d):
     for j in range(0,d):
         test[i,j] = j-i
 print(test)
+
+tensor.set(test)
+uncompressed_test = tensor()
+print(np.all(abs(uncompressed_test-test)<1e-14))
+
+
+### ----- TESTS FOR RANK-3 TENSORS ----- ###
+
+d = 3 # dimension
+
+# Create rank-3 identity operator
+def I_lambda(T, idx):
+    if idx[0]==idx[3] and idx[1]==idx[4] and idx[2]==idx[5]:
+        T[idx] = 1
+I = np.zeros((d, d, d, d, d, d))
+fill(I, (), I_lambda)
+
+# Create rank-3 transpose operators
+def Tr12_lambda(T, idx):
+    if idx[0]==idx[3] and idx[2]==idx[4] and idx[1]==idx[5]:
+        T[idx] = 1
+Tr12 = np.zeros((d, d, d, d, d, d))
+fill(Tr12, (), Tr12_lambda)
+
+def Tr01_lambda(T, idx):
+    if idx[1]==idx[3] and idx[0]==idx[4] and idx[2]==idx[5]:
+        T[idx] = 1
+Tr01 = np.zeros((d, d, d, d, d, d))
+fill(Tr01, (), Tr01_lambda)
+
+def Tr120_lambda(T, idx):
+    if idx[1]==idx[3] and idx[2]==idx[4] and idx[0]==idx[5]:
+        T[idx] = 1
+Tr120 = np.zeros((d, d, d, d, d, d))
+fill(Tr120, (), Tr120_lambda)
+
+def Tr201_lambda(T, idx):
+    if idx[2]==idx[3] and idx[0]==idx[4] and idx[1]==idx[5]:
+        T[idx] = 1
+Tr201 = np.zeros((d, d, d, d, d, d))
+fill(Tr201, (), Tr201_lambda)
+
+def Tr02_lambda(T, idx):
+    if idx[2]==idx[3] and idx[1]==idx[4] and idx[0]==idx[5]:
+        T[idx] = 1
+Tr02 = np.zeros((d, d, d, d, d, d))
+fill(Tr02, (), Tr02_lambda)
+
+# Create symmetric projection
+# Sym = (Tr+I)/2
+
+# Create antisymmetric projection
+AntiSym = (Tr12 + Tr01 + Tr02 - I - Tr120 - Tr201)/6 
+
+#test
+# tensor = Tensor(AntiSym)
+
+test = np.empty((d,d,d))
+
+for i in range(0,d):
+    for j in range(0,d):
+        for k in range(0,d):
+            test[i,j,k] = 1
+test = np.random.randint(256, size=(d,d,d))
+print(np.tensordot(AntiSym,test,axes=3))
 
 tensor.set(test)
 uncompressed_test = tensor()
