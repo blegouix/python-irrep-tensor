@@ -1,6 +1,7 @@
 import scipy
 import numpy as np
 import itertools
+from vendor.pysyt.pysyt.syt import * 
 
 # CSR storage
 class Csr:
@@ -70,7 +71,7 @@ def csr2dense(csr):
             dense[(csr.m_coalesc_idx[coalesc_id_id],) + tuple([int(csr.m_idx[i, j]) for j in range(0,len(csr.m_ndims)-1)])] = csr.m_values[i]
     return dense
 
-# Tensor filler
+# np.array-represented tensor filler
 def fill(T, idx, lambda_func):
     r = len(T.shape)
     d = T.shape[0]
@@ -81,10 +82,30 @@ def fill(T, idx, lambda_func):
         else:
             fill(T, new_idx, lambda_func)
 
+# Young tableau
+class YoungTableau:
+    m_shape = np.empty(0)
+    m_d = 0
+
+    def __init__(self, shape, d):
+        self.m_shape = np.array(shape)
+        self.m_d = d 
+
+    def irrep_dim(self):
+        hooks = hook_lengths(self.m_shape)
+        prod = 1 
+        for i in range(0, len(hooks)):
+            row = hooks[i]
+            for j in range(0, len(row)):
+                prod = prod * (self.m_d+j-i)/row[j]
+        return int(prod)
+
+
 # General Tensor class with internal symmetries
 class Tensor:
     m_r = 0
     m_d = 0
+    m_irrep_dim = 0
     m_U = Csr((0,)) 
     m_V = Csr((0,)) 
     m_data = np.empty(0) 
@@ -103,7 +124,7 @@ class Tensor:
 
         index = 0;
         # while V.m_ndims[0]<scipy.special.binom(self.m_d, self.m_r): # TODO: general formula
-        while V.m_ndims[0]<self.m_d*(self.m_d**2-1)/3: # TODO: general formula
+        while V.m_ndims[0]<self.m_irrep_dim: # TODO: general formula
             index = index+1;
             def candidate_lambda(T, idx):
                 T[idx] = index//2**(np.sum([self.m_d**i*idx[i] for i in range(0,len(idx))]))%2
@@ -120,10 +141,11 @@ class Tensor:
                 V.append_dense(v.reshape(tuple([self.m_d for i in range(0, self.m_r)])), axis=0)
         return [U, V] 
 
-    def __init__(self, Proj):
+    def __init__(self, young_tableau, Proj):
         # TODO: assert Proj hypercubic and pair rank
         self.m_r = len(Proj.shape)//2
         self.m_d = Proj.shape[0]
+        self.m_irrep_dim = young_tableau.irrep_dim()
         [self.m_U, self.m_V] = self.orthonormal_basis_subspace_eigenvalue_1(Proj)
 
     def __call__(self):
@@ -144,7 +166,10 @@ def fill(T, idx, lambda_func):
             fill(T, new_idx, lambda_func)
 
 
+#############
 ### TESTS ###
+#############
+
 print("----- TESTS FOR MATRIXES -----")
 
 d = 4 # dimension
@@ -169,9 +194,8 @@ Sym = (Tr+I)/2
 # Create antisymmetric projection
 AntiSym = (Tr-I)/2 
 
-"""
-#test
-tensor = Tensor(AntiSym)
+#test antisym
+tensor = Tensor(YoungTableau((1,1), d), AntiSym)
 
 test = np.empty((d,d))
 
@@ -183,7 +207,6 @@ print(test)
 tensor.set(test)
 uncompressed_test = tensor()
 print(np.all(abs(uncompressed_test-test)<1e-14))
-"""
 
 
 print("----- TESTS FOR RANK-3 TENSORS -----")
@@ -241,8 +264,7 @@ AntiSym12 = (Tr12 - I)/2
 MixedSym = I+Tr01-Tr02-Tr120
 
 # test antisym
-"""
-tensor = Tensor(AntiSym)
+tensor = Tensor(YoungTableau((1,1,1), d), AntiSym)
 
 test = np.empty((d,d,d))
 
@@ -253,11 +275,10 @@ print(test)
 tensor.set(test)
 uncompressed_test = tensor()
 print(np.all(abs(uncompressed_test-test)<1e-13))
-"""
 
 # test mixed sym
 print("-----")
-tensor = Tensor(MixedSym)
+tensor = Tensor(YoungTableau((2,1), d), MixedSym)
 
 test = np.empty((d,d,d))
 

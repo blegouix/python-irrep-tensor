@@ -1,0 +1,3 @@
+[submodule "vendor/pysyt"]
+	path = vendor/pysyt
+	url = git@github.com:stla/pysyt.git
