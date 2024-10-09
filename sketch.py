@@ -56,11 +56,9 @@ class Coo:
         axis = list(np.arange(0, len(x.shape))) if operate_on=="left" else list(np.arange(len(self.m_ndims)-len(x.shape), len(self.m_ndims)));
         axis_ortho = [ax for ax in list(np.arange(0, len(self.m_ndims))) if ax not in axis]
         prod = np.zeros(self.m_ndims[axis_ortho])
-        for k in range(0, self.m_ndims[axis if operate_on=="left" else axis_ortho][0]):
-            slice = self.get(k, axis=axis if operate_on=="left" else axis_ortho)
-            for l in range(0, slice.m_idx.shape[1]):
-                id = tuple(slice.m_idx[axis_ortho if operate_on=="left" else axis,l].astype(int));
-                prod[id if operate_on=="left" else k] = prod[id if operate_on=="left" else k] + x[k if operate_on=="left" else id]*slice.m_values[l]
+        for k in range(0, self.m_idx.shape[1]):
+            id = tuple(self.m_idx[axis_ortho if operate_on=="left" else axis,k].astype(int));
+            prod[id if operate_on=="left" else self.m_idx[axis_ortho,k].astype(int)] = prod[id if operate_on=="left" else self.m_idx[axis_ortho,k].astype(int)] + x[self.m_idx[axis,k].astype(int) if operate_on=="left" else id]*self.m_values[k]
         return prod
                 
 def coo2dense(coo):
