@@ -102,7 +102,8 @@ class Tensor:
         V = Csr(((0,)+tuple([self.m_d for i in range(0, self.m_r)]))); 
 
         index = 0;
-        while V.m_ndims[0]<scipy.special.binom(self.m_d, self.m_r): # TODO: general formula
+        # while V.m_ndims[0]<scipy.special.binom(self.m_d, self.m_r): # TODO: general formula
+        while V.m_ndims[0]<self.m_d*(self.m_d**2-1)/3: # TODO: general formula
             index = index+1;
             def candidate_lambda(T, idx):
                 T[idx] = index//2**(np.sum([self.m_d**i*idx[i] for i in range(0,len(idx))]))%2
@@ -168,6 +169,7 @@ Sym = (Tr+I)/2
 # Create antisymmetric projection
 AntiSym = (Tr-I)/2 
 
+"""
 #test
 tensor = Tensor(AntiSym)
 
@@ -181,6 +183,7 @@ print(test)
 tensor.set(test)
 uncompressed_test = tensor()
 print(np.all(abs(uncompressed_test-test)<1e-14))
+"""
 
 
 print("----- TESTS FOR RANK-3 TENSORS -----")
@@ -231,7 +234,14 @@ Sym = (Tr12 + Tr01 + Tr02 + I + Tr120 + Tr201)/6
 # Create antisymmetric projection
 AntiSym = (Tr12 + Tr01 + Tr02 - I - Tr120 - Tr201)/6 
 
-#test
+# Create rank-3 specific projection (dont know the name of it)
+Sym01 = (Tr01 + I)/2
+AntiSym12 = (Tr12 - I)/2
+# MixedSym = 4/3*Sym01*AntiSym12*Sym01
+MixedSym = I+Tr01-Tr02-Tr120
+
+# test antisym
+"""
 tensor = Tensor(AntiSym)
 
 test = np.empty((d,d,d))
@@ -243,3 +253,18 @@ print(test)
 tensor.set(test)
 uncompressed_test = tensor()
 print(np.all(abs(uncompressed_test-test)<1e-13))
+"""
+
+# test mixed sym
+print("-----")
+tensor = Tensor(MixedSym)
+
+test = np.empty((d,d,d))
+
+test = np.random.randint(256, size=(d,d,d))
+test = np.tensordot(MixedSym, test, axes=3)
+print(test)
+
+tensor.set(test)
+uncompressed_test = tensor()
+print(np.all(abs(uncompressed_test-test)<1e-12))
