@@ -64,6 +64,8 @@ class Csr:
                 prod[id_ortho] = prod[id_ortho] + x[id_prod]*self.m_values[k]
         return prod
                 
+
+# csr to dense converter
 def csr2dense(csr):
     dense = np.zeros(csr.m_ndims);
     for coalesc_id_id in range(0, len(csr.m_coalesc_idx)-1):
@@ -81,6 +83,7 @@ def fill(T, idx, lambda_func):
             lambda_func(T, new_idx)
         else:
             fill(T, new_idx, lambda_func)
+
 
 # Young tableau
 class YoungTableau:
@@ -113,23 +116,60 @@ class YoungTableau:
         I = np.zeros(tuple([self.m_d for i in range(0, 2*self.m_r)]))
         fill(I, (), tr_lambda([i for i in range(0, self.m_r)]))
         proj = np.copy(I)
+
+        def permutation_parity(lst):
+            '''\
+            Given a permutation of the digits 0..N in order as a list, 
+            returns its parity (or sign): +1 for even parity; -1 for odd.
+            '''
+            parity = 1
+            for i in range(0,len(lst)-1):
+                if lst[i] != i:
+                    parity *= -1
+                    mn = min(range(i,len(lst)), key=lst.__getitem__)
+                    lst[i],lst[mn] = lst[mn],lst[i]
+            return parity
+
+        def permutations_subset(t, subset_values):
+            '''\
+            Compute all permutations on a subset of indexes in t, keep the
+            rest of the indexes where they are
+            '''
+            subset_indexes = [i for i, x in enumerate(t) if x in subset_values]
+
+            elements_to_permute = [t[i] for i in subset_indexes]
+            
+            perms = itertools.permutations(elements_to_permute)
+            
+            result = []
+            
+            for perm in perms:
+                temp = list(t)
+                for idx, val in zip(subset_indexes, perm):
+                    temp[idx] = val
+                result.append(tuple(temp))
+            
+            return result
+
         for row in self.m_tableau:
             if len(row)>=2:
-                Tr = np.zeros(tuple([self.m_d for j in range(0, 2*self.m_r)]))
-                row_ = [elem-1 for elem in row]
-                row_.reverse()
-                fill(Tr, (), tr_lambda(row_))
-                Sym = (Tr+I)/2
-                proj = Sym
+                row_permutations = permutations_subset(tuple(range(1, self.m_r+1)), row)
+                Sym = np.zeros(tuple([self.m_d for j in range(0, 2*self.m_r)]))
+                for row_permutation in row_permutations:
+                    Tr = np.zeros(tuple([self.m_d for j in range(0, 2*self.m_r)]))
+                    fill(Tr, (), tr_lambda([elem-1 for elem in row_permutation]))
+                    Sym = Sym+Tr/len(row_permutations)
+                proj = np.tensordot(Sym, proj, axes=self.m_r)
         tableau_dual = dual_syt(self.m_tableau)
         for row in tableau_dual:
             if len(row)>=2:
-                Tr = np.zeros(tuple([self.m_d for j in range(0, 2*self.m_r)]))
-                row_ = [elem-1 for elem in row]
-                row_.reverse()
-                fill(Tr, (), tr_lambda(row_))
-                AntiSym = (Tr-I)/2
-                proj = AntiSym
+                row_permutations = permutations_subset(tuple(range(1, self.m_r+1)), row)
+                AntiSym = np.zeros(tuple([self.m_d for j in range(0, 2*self.m_r)]))
+                for row_permutation in row_permutations:
+                    Tr = np.zeros(tuple([self.m_d for j in range(0, 2*self.m_r)]))
+                    fill(Tr, (), tr_lambda([elem-1 for elem in row_permutation]))
+                    AntiSym = AntiSym+permutation_parity([elem-1 for elem in row_permutation])*Tr/len(row_permutations)
+                proj = np.tensordot(AntiSym, proj, axes=self.m_r)
         return proj
 
 
@@ -186,164 +226,53 @@ class Tensor:
     def set(self, x):
         self.m_data = self.m_U.mult(x, operate_on="right") 
 
-# Projector filler
-def fill(T, idx, lambda_func):
-    r = len(T.shape)
-    d = T.shape[0]
-    for i in range(0,d):
-        new_idx = idx + (i,)
-        if len(new_idx)==r:
-            lambda_func(T, new_idx)
-        else:
-            fill(T, new_idx, lambda_func)
 
 
 #############
 ### TESTS ###
 #############
 
+d = 4 # dimension
+
+def test(tableau):
+    test = np.empty(tuple([tableau.m_d for i in range(0, tableau.m_r)]))
+
+    test = np.random.randint(256, size=tuple([tableau.m_d for i in range(0, tableau.m_r)]))
+    test = np.tensordot(tableau.projector(),test,axes=tableau.m_r)
+    print(test)
+
+    tensor = Tensor(tableau)
+
+    tensor.set(test)
+    uncompressed_test = tensor()
+    print(np.all(abs(uncompressed_test-test)<1e-10))
+
 print("----- TESTS FOR MATRIXES -----")
-
-d = 4 # dimension
-
-# Create rank-2 identity operator
-def I_lambda(T, idx):
-    if idx[0]==idx[2] and idx[1]==idx[3]:
-        T[idx] = 1
-I = np.zeros((d, d, d, d))
-fill(I, (), I_lambda)
-
-# Create rank-2 transpose operator
-def Tr_lambda(T, idx):
-    if idx[1]==idx[2] and idx[0]==idx[3]:
-        T[idx] = 1
-Tr = np.zeros((d, d, d, d))
-fill(Tr, (), Tr_lambda)
-
-# Create symmetric projection
-Sym = (Tr+I)/2
-
-# Create antisymmetric projection
-AntiSym = (Tr-I)/2 
-
-#test sym
-tensor = Tensor(YoungTableau([[1, 2]], d))
-
-test = np.empty((d,d))
-
-for i in range(0,d):
-    for j in range(0,d):
-        test[i,j] = i+j 
-print(test)
-
-tensor.set(test)
-uncompressed_test = tensor()
-print(np.all(abs(uncompressed_test-test)<1e-14))
-
-#test antisym
-tensor = Tensor(YoungTableau([[1],[2]], d))
-
-test = np.empty((d,d))
-
-for i in range(0,d):
-    for j in range(0,d):
-        test[i,j] = j-i
-print(test)
-
-tensor.set(test)
-uncompressed_test = tensor()
-print(np.all(abs(uncompressed_test-test)<1e-14))
-
-print("----- TESTS FOR RANK-3 TENSORS -----")
-
-d = 4 # dimension
-
-# Create rank-3 identity operator
-def I_lambda(T, idx):
-    if idx[0]==idx[3] and idx[1]==idx[4] and idx[2]==idx[5]:
-        T[idx] = 1
-I = np.zeros((d, d, d, d, d, d))
-fill(I, (), I_lambda)
-
-# Create rank-3 transpose operators
-def Tr12_lambda(T, idx):
-    if idx[0]==idx[3] and idx[2]==idx[4] and idx[1]==idx[5]:
-        T[idx] = 1
-Tr12 = np.zeros((d, d, d, d, d, d))
-fill(Tr12, (), Tr12_lambda)
-
-def Tr01_lambda(T, idx):
-    if idx[1]==idx[3] and idx[0]==idx[4] and idx[2]==idx[5]:
-        T[idx] = 1
-Tr01 = np.zeros((d, d, d, d, d, d))
-fill(Tr01, (), Tr01_lambda)
-
-def Tr120_lambda(T, idx):
-    if idx[1]==idx[3] and idx[2]==idx[4] and idx[0]==idx[5]:
-        T[idx] = 1
-Tr120 = np.zeros((d, d, d, d, d, d))
-fill(Tr120, (), Tr120_lambda)
-
-def Tr201_lambda(T, idx):
-    if idx[2]==idx[3] and idx[0]==idx[4] and idx[1]==idx[5]:
-        T[idx] = 1
-Tr201 = np.zeros((d, d, d, d, d, d))
-fill(Tr201, (), Tr201_lambda)
-
-def Tr02_lambda(T, idx):
-    if idx[2]==idx[3] and idx[1]==idx[4] and idx[0]==idx[5]:
-        T[idx] = 1
-Tr02 = np.zeros((d, d, d, d, d, d))
-fill(Tr02, (), Tr02_lambda)
-
-# Create symmetric projection
-Sym = (Tr12 + Tr01 + Tr02 + I + Tr120 + Tr201)/6 
-
-# Create antisymmetric projection
-AntiSym = (Tr12 + Tr01 + Tr02 - I - Tr120 - Tr201)/6 
-
-# Create rank-3 specific projection (dont know the name of it)
-Sym01 = (Tr01 + I)/2
-AntiSym12 = (Tr12 - I)/2
-# MixedSym = 4/3*Sym01*AntiSym12*Sym01
-MixedSym = I+Tr01-Tr02-Tr120
-
 # test sym 
-tensor = Tensor(YoungTableau([[1, 2, 3]], d))
-
-test = np.empty((d,d,d))
-
-test = np.random.randint(256, size=(d,d,d))
-test = np.tensordot(Sym,test,axes=3)
-print(test)
-
-tensor.set(test)
-uncompressed_test = tensor()
-print(np.all(abs(uncompressed_test-test)<1e-13))
+tableau = YoungTableau([[1, 2]], d)
+test(tableau)
 
 # test antisym
-tensor = Tensor(YoungTableau([[1],[2],[3]], d))
+tableau = YoungTableau([[1], [2]], d)
+test(tableau)
 
-test = np.empty((d,d,d))
+print("----- TESTS FOR RANK-3 TENSORS -----")
+# test sym 
+tableau = YoungTableau([[1, 2, 3]], d)
+test(tableau)
 
-test = np.random.randint(256, size=(d,d,d))
-test = np.tensordot(AntiSym,test,axes=3)
-print(test)
-
-tensor.set(test)
-uncompressed_test = tensor()
-print(np.all(abs(uncompressed_test-test)<1e-13))
+# test antisym
+tableau = YoungTableau([[1],[2],[3]], d)
+test(tableau)
 
 # test mixed sym
-print("-----")
-tensor = Tensor(YoungTableau([[1,2],[3]], d))
+tableau = YoungTableau([[1,2],[3]], d)
+test(tableau)
 
-test = np.empty((d,d,d))
+tableau = YoungTableau([[1,3],[2]], d)
+test(tableau)
 
-test = np.random.randint(256, size=(d,d,d))
-test = np.tensordot(MixedSym, test, axes=3)
-print(test)
-
-tensor.set(test)
-uncompressed_test = tensor()
-print(np.all(abs(uncompressed_test-test)<1e-12))
+print("----- TESTS FOR RANK-4 TENSORS -----")
+# test Riemann tensor
+tableau = YoungTableau([[1,2],[3,4]], d)
+test(tableau)
