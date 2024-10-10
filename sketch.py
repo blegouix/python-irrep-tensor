@@ -198,10 +198,12 @@ class Tensor:
         # while V.m_ndims[0]<scipy.special.binom(self.m_d, self.m_r): # TODO: general formula
         while V.m_ndims[0]<self.m_irrep_dim: # TODO: general formula
             index = index+1;
+            candidate = np.zeros(tuple([self.m_d for i in range(0, self.m_r)]))
+            """
             def candidate_lambda(T, idx):
                 T[idx] = index//2**(np.sum([self.m_d**i*idx[i] for i in range(0,len(idx))]))%2
-            candidate = np.zeros(tuple([self.m_d for i in range(0, self.m_r)]))
             fill(candidate, (), candidate_lambda)
+            """
             candidate = np.tensordot(Proj, np.random.randint(2, size=tuple([self.m_d for i in range(0, self.m_r)])), axes=self.m_r);
             v = self.orthogonalize(np.tensordot(Proj, candidate, axes=self.m_r), V);
 
@@ -274,5 +276,5 @@ test(tableau)
 
 print("----- TESTS FOR RANK-4 TENSORS -----")
 # test Riemann tensor
-tableau = YoungTableau([[1,2],[3,4]], d)
+tableau = YoungTableau([[1,3],[2,4]], d)
 test(tableau)
