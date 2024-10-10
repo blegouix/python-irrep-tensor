@@ -84,11 +84,15 @@ def fill(T, idx, lambda_func):
 
 # Young tableau
 class YoungTableau:
+    m_tableau = [[]] 
     m_shape = np.empty(0)
+    m_r = 0
     m_d = 0
 
-    def __init__(self, shape, d):
-        self.m_shape = np.array(shape)
+    def __init__(self, tableau, d):
+        self.m_tableau = tableau
+        self.m_shape = np.array([len(row) for row in tableau])
+        self.m_r = np.sum(self.m_shape)
         self.m_d = d 
 
     def irrep_dim(self):
@@ -99,6 +103,34 @@ class YoungTableau:
             for j in range(0, len(row)):
                 prod = prod * (self.m_d+j-i)/row[j]
         return int(prod)
+
+    def projector(self):
+        def tr_lambda(idx_to_permute):
+            def lambda_to_return(T, idx):
+                if all([idx[i]==idx[idx_to_permute[i]+self.m_r] for i in range(0, len(idx_to_permute))]):
+                    T[idx] = 1
+            return lambda_to_return 
+        I = np.zeros(tuple([self.m_d for i in range(0, 2*self.m_r)]))
+        fill(I, (), tr_lambda([i for i in range(0, self.m_r)]))
+        proj = np.copy(I)
+        for row in self.m_tableau:
+            if len(row)>=2:
+                Tr = np.zeros(tuple([self.m_d for j in range(0, 2*self.m_r)]))
+                row_ = [elem-1 for elem in row]
+                row_.reverse()
+                fill(Tr, (), tr_lambda(row_))
+                Sym = (Tr+I)/2
+                proj = Sym*proj
+        tableau_dual = dual_syt(self.m_tableau)
+        for row in tableau_dual:
+            if len(row)>=2:
+                Tr = np.zeros(tuple([self.m_d for j in range(0, 2*self.m_r)]))
+                row_ = [elem-1 for elem in row]
+                row_.reverse()
+                fill(Tr, (), tr_lambda(row_))
+                AntiSym = (Tr-I)/2
+                proj = AntiSym
+        return proj
 
 
 # General Tensor class with internal symmetries
@@ -141,12 +173,12 @@ class Tensor:
                 V.append_dense(v.reshape(tuple([self.m_d for i in range(0, self.m_r)])), axis=0)
         return [U, V] 
 
-    def __init__(self, young_tableau, Proj):
+    def __init__(self, young_tableau):
         # TODO: assert Proj hypercubic and pair rank
-        self.m_r = len(Proj.shape)//2
-        self.m_d = Proj.shape[0]
+        self.m_r = young_tableau.m_r 
+        self.m_d = young_tableau.m_d
         self.m_irrep_dim = young_tableau.irrep_dim()
-        [self.m_U, self.m_V] = self.orthonormal_basis_subspace_eigenvalue_1(Proj)
+        [self.m_U, self.m_V] = self.orthonormal_basis_subspace_eigenvalue_1(young_tableau.projector())
 
     def __call__(self):
         return self.m_V.mult(self.m_data, operate_on="left") 
@@ -195,7 +227,7 @@ Sym = (Tr+I)/2
 AntiSym = (Tr-I)/2 
 
 #test antisym
-tensor = Tensor(YoungTableau((1,1), d), AntiSym)
+tensor = Tensor(YoungTableau([[1],[2]], d))
 
 test = np.empty((d,d))
 
@@ -207,7 +239,6 @@ print(test)
 tensor.set(test)
 uncompressed_test = tensor()
 print(np.all(abs(uncompressed_test-test)<1e-14))
-
 
 print("----- TESTS FOR RANK-3 TENSORS -----")
 
@@ -264,7 +295,7 @@ AntiSym12 = (Tr12 - I)/2
 MixedSym = I+Tr01-Tr02-Tr120
 
 # test antisym
-tensor = Tensor(YoungTableau((1,1,1), d), AntiSym)
+tensor = Tensor(YoungTableau([[1],[2],[3]], d))
 
 test = np.empty((d,d,d))
 
@@ -278,7 +309,7 @@ print(np.all(abs(uncompressed_test-test)<1e-13))
 
 # test mixed sym
 print("-----")
-tensor = Tensor(YoungTableau((2,1), d), MixedSym)
+tensor = Tensor(YoungTableau([[1,2],[3]], d))
 
 test = np.empty((d,d,d))
 
