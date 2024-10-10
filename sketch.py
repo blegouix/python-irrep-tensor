@@ -120,7 +120,7 @@ class YoungTableau:
                 row_.reverse()
                 fill(Tr, (), tr_lambda(row_))
                 Sym = (Tr+I)/2
-                proj = Sym*proj
+                proj = Sym
         tableau_dual = dual_syt(self.m_tableau)
         for row in tableau_dual:
             if len(row)>=2:
@@ -226,6 +226,20 @@ Sym = (Tr+I)/2
 # Create antisymmetric projection
 AntiSym = (Tr-I)/2 
 
+#test sym
+tensor = Tensor(YoungTableau([[1, 2]], d))
+
+test = np.empty((d,d))
+
+for i in range(0,d):
+    for j in range(0,d):
+        test[i,j] = i+j 
+print(test)
+
+tensor.set(test)
+uncompressed_test = tensor()
+print(np.all(abs(uncompressed_test-test)<1e-14))
+
 #test antisym
 tensor = Tensor(YoungTableau([[1],[2]], d))
 
@@ -293,6 +307,19 @@ Sym01 = (Tr01 + I)/2
 AntiSym12 = (Tr12 - I)/2
 # MixedSym = 4/3*Sym01*AntiSym12*Sym01
 MixedSym = I+Tr01-Tr02-Tr120
+
+# test sym 
+tensor = Tensor(YoungTableau([[1, 2, 3]], d))
+
+test = np.empty((d,d,d))
+
+test = np.random.randint(256, size=(d,d,d))
+test = np.tensordot(Sym,test,axes=3)
+print(test)
+
+tensor.set(test)
+uncompressed_test = tensor()
+print(np.all(abs(uncompressed_test-test)<1e-13))
 
 # test antisym
 tensor = Tensor(YoungTableau([[1],[2],[3]], d))
