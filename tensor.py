@@ -1,6 +1,8 @@
 import numpy as np
 
 from csr import *
+from fill import *
+from hamming_weight_binary_code import *
 
 # General Tensor class with internal symmetries
 class Tensor:
@@ -24,15 +26,12 @@ class Tensor:
         V = Csr(((0,)+tuple([self.m_d for i in range(0, self.m_r)]))); 
 
         index = 0;
-        # while V.m_ndims[0]<scipy.special.binom(self.m_d, self.m_r): # TODO: general formula
-        while V.m_ndims[0]<self.m_irrep_dim: # TODO: general formula
+        while V.m_ndims[0]<self.m_irrep_dim:
             index = index+1;
             candidate = np.zeros(tuple([self.m_d for i in range(0, self.m_r)]))
-            """
             def candidate_lambda(T, idx):
-                T[idx] = index//2**(np.sum([self.m_d**i*idx[i] for i in range(0,len(idx))]))%2
+                T[idx] = nth_binary_by_hamming_weight(index, self.m_d**self.m_r)//2**int(np.sum([self.m_d**i*idx[i] for i in range(0,len(idx))]))%2
             fill(candidate, (), candidate_lambda)
-            """
             candidate = np.tensordot(Proj, np.random.randint(2, size=tuple([self.m_d for i in range(0, self.m_r)])), axes=self.m_r);
             v = self.orthogonalize(np.tensordot(Proj, candidate, axes=self.m_r), V);
 
