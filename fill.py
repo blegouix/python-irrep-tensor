@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2024 Baptiste Legouix
+# SPDX-License-Identifier: GPL-3.0
+
 # np.array-represented tensor filler
 def fill(T, idx, lambda_func):
     r = len(T.shape)

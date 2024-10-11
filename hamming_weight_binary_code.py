@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2024 Baptiste Legouix
+# SPDX-License-Identifier: GPL-3.0
+
 import itertools
 
 def nth_binary_by_hamming_weight(n, length):

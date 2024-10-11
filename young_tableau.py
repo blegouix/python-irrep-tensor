@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2024 Baptiste Legouix
+# SPDX-License-Identifier: GPL-3.0
+
 import numpy as np
 import itertools
 from vendor.pysyt.pysyt.syt import * 
