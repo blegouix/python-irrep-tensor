@@ -5,7 +5,7 @@ Relies on Young Tableau. Ie. :
 
 ```
 tableau = YoungTableau([[1,2],[3]], 4) # Build Young tableau for mixed symmetric rank-3 tensors of dimension 4
-projector = tableau.projector() # Compute the associated Young projector (dimension 8)
+projector = tableau.projector() # Compute the associated Young projector (dimension 6)
 
 test = np.random.randint(256, size=(4, 4, 4)) # Generate a random dimension 4 rank-3 tensor
 test = np.tensordot(projector, test, axes=3) # Project the tensor to extract its mixed-symmetric part (corresponding to the Young tableau defined above)
