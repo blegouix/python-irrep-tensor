@@ -35,9 +35,8 @@ class YoungTableau:
                 if all([idx[i]==idx[idx_to_permute[i]+self.m_r] for i in range(0, len(idx_to_permute))]):
                     T[idx] = 1
             return lambda_to_return 
-        I = np.zeros(tuple([self.m_d for i in range(0, 2*self.m_r)]))
-        fill(I, (), tr_lambda([i for i in range(0, self.m_r)]))
-        proj = np.copy(I)
+        proj = np.zeros(tuple([self.m_d for i in range(0, 2*self.m_r)]))
+        fill(proj, (), tr_lambda([i for i in range(0, self.m_r)]))
 
         def permutation_parity(lst):
             '''\
