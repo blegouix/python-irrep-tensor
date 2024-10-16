@@ -3,7 +3,7 @@
 
 import itertools
 
-def nth_binary_by_hamming_weight(n, length):
+def index_hamming_weight_code(n, length):
     count = 0
     # Iterate through numbers by increasing Hamming weight
     for hamming_weight in range(0, length):
